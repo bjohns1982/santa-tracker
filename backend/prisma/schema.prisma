@@ -1,0 +1,88 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TourGuide {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  tours        Tour[]
+}
+
+model Tour {
+  id          String    @id @default(cuid())
+  name        String
+  tourGuideId String
+  tourGuide   TourGuide @relation(fields: [tourGuideId], references: [id], onDelete: Cascade)
+  inviteCode  String    @unique
+  city        String
+  state       String
+  zipCode     String
+  status      TourStatus @default(PLANNED)
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  families    Family[]
+  visits      Visit[]
+}
+
+enum TourStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
+model Family {
+  id           String   @id @default(cuid())
+  tourId       String
+  tour         Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  streetNumber String
+  streetName   String
+  familyName   String
+  latitude     Float?
+  longitude    Float?
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  children     Child[]
+  visits       Visit[]
+}
+
+model Child {
+  id                String   @id @default(cuid())
+  familyId          String
+  family            Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  firstName         String
+  specialInstructions String?
+  createdAt         DateTime @default(now())
+}
+
+model Visit {
+  id          String      @id @default(cuid())
+  familyId    String
+  family      Family      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  tourId      String
+  tour        Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  status      VisitStatus @default(PENDING)
+  order       Int
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime    @default(now())
+}
+
+enum VisitStatus {
+  PENDING
+  ON_WAY
+  VISITING
+  COMPLETED
+}
+
