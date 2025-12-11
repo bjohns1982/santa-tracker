@@ -3,6 +3,7 @@ import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { geocodeAddress } from '../services/geocoding';
+import { formatPhoneNumber, validatePhoneNumber } from '../services/phoneValidation';
 
 const router = express.Router();
 
@@ -16,13 +17,33 @@ const createFamilySchema = z.object({
   streetName: z.string().min(1),
   familyName: z.string().min(1),
   children: z.array(childSchema).min(1),
+  phoneNumber1: z.string().optional().nullable(),
+  phoneNumber2: z.string().optional().nullable(),
+  smsOptIn: z.boolean().optional().default(false),
 });
 
 // Create family (public via invite code)
 router.post('/invite/:inviteCode', async (req, res) => {
   try {
     const { inviteCode } = req.params;
-    const { streetNumber, streetName, familyName, children } = createFamilySchema.parse(req.body);
+    const { streetNumber, streetName, familyName, children, phoneNumber1, phoneNumber2, smsOptIn } = createFamilySchema.parse(req.body);
+
+    // Validate phone numbers if SMS opt-in is enabled
+    if (smsOptIn) {
+      if (!phoneNumber1) {
+        return res.status(400).json({ error: 'Phone number is required when SMS opt-in is enabled' });
+      }
+      const formattedPhone1 = formatPhoneNumber(phoneNumber1);
+      if (!formattedPhone1 || !validatePhoneNumber(formattedPhone1)) {
+        return res.status(400).json({ error: 'Invalid phone number format. Please use format: +1XXXXXXXXXX' });
+      }
+      if (phoneNumber2) {
+        const formattedPhone2 = formatPhoneNumber(phoneNumber2);
+        if (!formattedPhone2 || !validatePhoneNumber(formattedPhone2)) {
+          return res.status(400).json({ error: 'Invalid secondary phone number format. Please use format: +1XXXXXXXXXX' });
+        }
+      }
+    }
 
     // Verify tour exists
     const tour = await prisma.tour.findUnique({
@@ -61,6 +82,9 @@ router.post('/invite/:inviteCode', async (req, res) => {
         where: { familyId: existingFamily.id },
       });
 
+      const formattedPhone1 = phoneNumber1 ? formatPhoneNumber(phoneNumber1) : null;
+      const formattedPhone2 = phoneNumber2 ? formatPhoneNumber(phoneNumber2) : null;
+
       family = await prisma.family.update({
         where: { id: existingFamily.id },
         data: {
@@ -68,6 +92,9 @@ router.post('/invite/:inviteCode', async (req, res) => {
           streetName,
           latitude: geocodeResult?.latitude || null,
           longitude: geocodeResult?.longitude || null,
+          phoneNumber1: formattedPhone1,
+          phoneNumber2: formattedPhone2,
+          smsOptIn: smsOptIn || false,
           children: {
             create: children,
           },
@@ -91,6 +118,9 @@ router.post('/invite/:inviteCode', async (req, res) => {
         tour.zipCode
       );
 
+      const formattedPhone1 = phoneNumber1 ? formatPhoneNumber(phoneNumber1) : null;
+      const formattedPhone2 = phoneNumber2 ? formatPhoneNumber(phoneNumber2) : null;
+
       // Create new family with children
       family = await prisma.family.create({
         data: {
@@ -101,6 +131,9 @@ router.post('/invite/:inviteCode', async (req, res) => {
           order: maxOrder + 1,
           latitude: geocodeResult?.latitude || null,
           longitude: geocodeResult?.longitude || null,
+          phoneNumber1: formattedPhone1,
+          phoneNumber2: formattedPhone2,
+          smsOptIn: smsOptIn || false,
           children: {
             create: children,
           },
@@ -131,7 +164,24 @@ router.post('/invite/:inviteCode', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { streetNumber, streetName, familyName, children } = createFamilySchema.parse(req.body);
+    const { streetNumber, streetName, familyName, children, phoneNumber1, phoneNumber2, smsOptIn } = createFamilySchema.parse(req.body);
+
+    // Validate phone numbers if SMS opt-in is enabled
+    if (smsOptIn) {
+      if (!phoneNumber1) {
+        return res.status(400).json({ error: 'Phone number is required when SMS opt-in is enabled' });
+      }
+      const formattedPhone1 = formatPhoneNumber(phoneNumber1);
+      if (!formattedPhone1 || !validatePhoneNumber(formattedPhone1)) {
+        return res.status(400).json({ error: 'Invalid phone number format. Please use format: +1XXXXXXXXXX' });
+      }
+      if (phoneNumber2) {
+        const formattedPhone2 = formatPhoneNumber(phoneNumber2);
+        if (!formattedPhone2 || !validatePhoneNumber(formattedPhone2)) {
+          return res.status(400).json({ error: 'Invalid secondary phone number format. Please use format: +1XXXXXXXXXX' });
+        }
+      }
+    }
 
     // Get family to find tour
     const existingFamily = await prisma.family.findUnique({
@@ -157,6 +207,9 @@ router.put('/:id', async (req, res) => {
       where: { familyId: id },
     });
 
+    const formattedPhone1 = phoneNumber1 ? formatPhoneNumber(phoneNumber1) : null;
+    const formattedPhone2 = phoneNumber2 ? formatPhoneNumber(phoneNumber2) : null;
+
     const family = await prisma.family.update({
       where: { id },
       data: {
@@ -165,6 +218,9 @@ router.put('/:id', async (req, res) => {
         familyName,
         latitude: geocodeResult?.latitude || null,
         longitude: geocodeResult?.longitude || null,
+        phoneNumber1: formattedPhone1,
+        phoneNumber2: formattedPhone2,
+        smsOptIn: smsOptIn || false,
         children: {
           create: children,
         },

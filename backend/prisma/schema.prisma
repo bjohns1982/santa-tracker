@@ -52,6 +52,9 @@ model Family {
   latitude     Float?
   longitude    Float?
   order        Int      @default(0)
+  phoneNumber1 String?
+  phoneNumber2 String?
+  smsOptIn     Boolean  @default(false)
   createdAt    DateTime @default(now())
   children     Child[]
   visits       Visit[]
@@ -67,16 +70,18 @@ model Child {
 }
 
 model Visit {
-  id          String      @id @default(cuid())
-  familyId    String
-  family      Family      @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  tourId      String
-  tour        Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
-  status      VisitStatus @default(PENDING)
-  order       Int
-  startedAt   DateTime?
-  completedAt DateTime?
-  createdAt   DateTime    @default(now())
+  id            String      @id @default(cuid())
+  familyId      String
+  family        Family      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  tourId        String
+  tour          Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  status        VisitStatus @default(PENDING)
+  order         Int
+  startedAt     DateTime?
+  completedAt   DateTime?
+  smsResponse   String?
+  smsResponseAt DateTime?
+  createdAt     DateTime    @default(now())
 }
 
 enum VisitStatus {
@@ -84,5 +89,6 @@ enum VisitStatus {
   ON_WAY
   VISITING
   COMPLETED
+  SKIPPED
 }
 

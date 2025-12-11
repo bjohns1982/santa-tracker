@@ -71,6 +71,10 @@ export default function TourGuideDashboard() {
         loadCurrentVisit();
       });
 
+      newSocket.on("visit-skipped", () => {
+        loadCurrentVisit();
+      });
+
       const syncSelectedTour = (updatedTours: typeof tours) => {
         if (!selectedTour) return;
         const updated = updatedTours.find((t) => t.id === selectedTour.id);
@@ -360,8 +364,19 @@ export default function TourGuideDashboard() {
     );
 
   const activeVisits = visits
-    .filter((visit) => visit.status !== "COMPLETED")
+    .filter(
+      (visit) => visit.status !== "COMPLETED" && visit.status !== "SKIPPED"
+    )
     .sort((a, b) => a.order - b.order);
+
+  const skippedVisits = visits
+    .filter((visit) => visit.status === "SKIPPED")
+    .sort((a, b) =>
+      a.smsResponseAt && b.smsResponseAt
+        ? new Date(b.smsResponseAt).getTime() -
+          new Date(a.smsResponseAt).getTime()
+        : a.order - b.order
+    );
 
   const activeFamilies =
     selectedTour?.status === "ACTIVE"
@@ -379,9 +394,15 @@ export default function TourGuideDashboard() {
             🎅 Santa Tracker Dashboard
           </h1>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-stretch sm:items-center w-full sm:w-auto">
-            <span className="text-white text-md sm:text-base text-center sm:text-left font-bold">
+            <span className="text-white text-sm sm:text-base text-center sm:text-left">
               Welcome, {tourGuide?.name}!
             </span>
+            <button
+              onClick={logout}
+              className="btn-secondary text-sm sm:text-base whitespace-nowrap"
+            >
+              Logout
+            </button>
           </div>
         </div>
 
@@ -705,14 +726,65 @@ export default function TourGuideDashboard() {
                     </div>
                   </div>
                 )}
+              {selectedTour.status === "ACTIVE" && skippedVisits.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-base sm:text-lg font-bold text-orange-700 mb-3">
+                    Skipped Visits ({skippedVisits.length})
+                  </h3>
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {skippedVisits.map((visit) => (
+                      <div
+                        key={visit.id}
+                        className="p-3 border-2 border-orange-300 rounded-lg bg-orange-50 flex flex-col gap-2"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold text-gray-700">
+                              The {visit.family.familyName} Family
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {visit.family.streetNumber}{" "}
+                              {visit.family.streetName}
+                            </p>
+                          </div>
+                          <span className="text-xs bg-orange-500 text-white px-2 py-1 rounded">
+                            Skipped
+                          </span>
+                        </div>
+                        {visit.smsResponse && (
+                          <div className="bg-white p-2 rounded border border-orange-200">
+                            <p className="text-xs font-semibold text-orange-800 mb-1">
+                              SMS Response:
+                            </p>
+                            <p className="text-xs text-gray-700">
+                              "{visit.smsResponse}"
+                            </p>
+                            {visit.smsResponseAt && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                {new Date(visit.smsResponseAt).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-500">
+                          Kids:{" "}
+                          {visit.family.children
+                            .map((c: any) => c.firstName)
+                            .join(", ")}
+                        </p>
+                        <button
+                          onClick={() => handleRequeueVisit(visit.id)}
+                          className="btn-secondary text-sm self-start"
+                        >
+                          Add Back to Roster
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-          <button
-            onClick={logout}
-            className="btn-secondary text-sm sm:text-base"
-          >
-            Logout
-          </button>
         </div>
       </div>
 

@@ -5,6 +5,8 @@ import TourGuideDashboard from './pages/TourGuideDashboard';
 import FamilySignUp from './pages/FamilySignUp';
 import FamilyView from './pages/FamilyView';
 import FamilyLookup from './pages/FamilyLookup';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 import { AuthProvider } from './contexts/AuthContext';
 
 function App() {
@@ -19,6 +21,8 @@ function App() {
           <Route path="/signup/:inviteCode" element={<FamilySignUp />} />
           <Route path="/lookup/:inviteCode" element={<FamilyLookup />} />
           <Route path="/family/:familyId" element={<FamilyView />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

@@ -2,6 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { sendOnDeckMessage } from '../services/smsService';
 
 const router = express.Router();
 
@@ -85,7 +86,7 @@ router.patch('/:visitId/status', authenticateToken, async (req: AuthRequest, res
     const { status } = req.body;
     const tourGuideId = req.userId!;
 
-    if (!['PENDING', 'ON_WAY', 'VISITING', 'COMPLETED'].includes(status)) {
+    if (!['PENDING', 'ON_WAY', 'VISITING', 'COMPLETED', 'SKIPPED'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
@@ -130,8 +131,8 @@ router.patch('/:visitId/status', authenticateToken, async (req: AuthRequest, res
       },
     });
 
-    // If completing a visit, set next visit to ON_WAY
-    if (status === 'COMPLETED') {
+    // If completing or skipping a visit, set next visit to ON_WAY
+    if (status === 'COMPLETED' || status === 'SKIPPED') {
       const nextVisit = await prisma.visit.findFirst({
         where: {
           tourId: visit.tourId,
@@ -147,6 +148,45 @@ router.patch('/:visitId/status', authenticateToken, async (req: AuthRequest, res
         await prisma.visit.update({
           where: { id: nextVisit.id },
           data: { status: 'ON_WAY' },
+        });
+      }
+    }
+
+    // If starting a visit (VISITING), send on-deck message to next family
+    if (status === 'VISITING') {
+      const nextVisit = await prisma.visit.findFirst({
+        where: {
+          tourId: visit.tourId,
+          order: { gt: visit.order },
+          status: 'PENDING',
+        },
+        orderBy: {
+          order: 'asc',
+        },
+        include: {
+          family: true,
+        },
+      });
+
+      if (nextVisit && nextVisit.family.smsOptIn) {
+        // Calculate estimated minutes (5 minutes per visit)
+        const visitsBefore = await prisma.visit.count({
+          where: {
+            tourId: visit.tourId,
+            order: {
+              gt: visit.order,
+              lt: nextVisit.order,
+            },
+            status: {
+              not: 'SKIPPED',
+            },
+          },
+        });
+        const estimatedMinutes = (visitsBefore + 1) * 5;
+        
+        // Send on-deck message asynchronously (don't wait for it)
+        sendOnDeckMessage(nextVisit.familyId, estimatedMinutes).catch(err => {
+          console.error('Failed to send on-deck message:', err);
         });
       }
     }
@@ -200,6 +240,8 @@ router.post('/:visitId/requeue', authenticateToken, async (req: AuthRequest, res
         order: newOrder,
         startedAt: null,
         completedAt: null,
+        smsResponse: null,
+        smsResponseAt: null,
       },
       include: {
         family: true,
@@ -264,6 +306,75 @@ router.post('/:tourId/location', authenticateToken, async (req: AuthRequest, res
   }
 });
 
+// Manually skip a visit
+router.post('/:visitId/skip', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { visitId } = req.params;
+    const tourGuideId = req.userId!;
+
+    const visit = await prisma.visit.findUnique({
+      where: { id: visitId },
+      include: { tour: true },
+    });
+
+    if (!visit) {
+      return res.status(404).json({ error: 'Visit not found' });
+    }
+
+    if (visit.tour.tourGuideId !== tourGuideId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const updatedVisit = await prisma.visit.update({
+      where: { id: visitId },
+      data: {
+        status: 'SKIPPED',
+        smsResponse: 'Manually skipped by tour guide',
+        smsResponseAt: new Date(),
+      },
+      include: {
+        family: {
+          include: {
+            children: true,
+          },
+        },
+      },
+    });
+
+    // Set next visit to ON_WAY
+    const nextVisit = await prisma.visit.findFirst({
+      where: {
+        tourId: visit.tourId,
+        order: { gt: visit.order },
+        status: 'PENDING',
+      },
+      orderBy: {
+        order: 'asc',
+      },
+    });
+
+    if (nextVisit) {
+      await prisma.visit.update({
+        where: { id: nextVisit.id },
+        data: { status: 'ON_WAY' },
+      });
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`tour-${visit.tourId}`).emit('visit-skipped', {
+        visit: updatedVisit,
+        tourId: visit.tourId,
+      });
+    }
+
+    res.json(updatedVisit);
+  } catch (error) {
+    console.error('Skip visit error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get current visit status for a tour
 router.get('/tour/:tourId/current', async (req, res) => {
   try {
@@ -283,6 +394,54 @@ router.get('/tour/:tourId/current', async (req, res) => {
       },
     });
 
+    // If no visits exist (tour hasn't started), return families instead
+    if (visits.length === 0) {
+      const tour = await prisma.tour.findUnique({
+        where: { id: tourId },
+        include: {
+          families: {
+            include: {
+              children: true,
+            },
+            orderBy: {
+              order: 'asc',
+            },
+          },
+        },
+      });
+
+      if (!tour) {
+        return res.status(404).json({ error: 'Tour not found' });
+      }
+
+      // Convert families to visit-like format for frontend compatibility
+      const familyVisits = tour.families.map((family, index) => ({
+        id: `family-${family.id}`, // Temporary ID for families
+        familyId: family.id,
+        tourId: tour.id,
+        order: family.order,
+        status: 'PENDING' as const,
+        family: {
+          id: family.id,
+          familyName: family.familyName,
+          streetNumber: family.streetNumber,
+          streetName: family.streetName,
+          latitude: family.latitude,
+          longitude: family.longitude,
+          children: family.children,
+        },
+      }));
+
+      return res.json({
+        visits: familyVisits,
+        currentVisit: null,
+        nextVisit: null,
+        completedCount: 0,
+        skippedCount: 0,
+        totalCount: familyVisits.length,
+      });
+    }
+
     const currentVisit = visits.find(v => v.status === 'ON_WAY' || v.status === 'VISITING');
     const nextVisit = visits.find(v => v.status === 'PENDING');
 
@@ -291,6 +450,7 @@ router.get('/tour/:tourId/current', async (req, res) => {
       currentVisit,
       nextVisit,
       completedCount: visits.filter(v => v.status === 'COMPLETED').length,
+      skippedCount: visits.filter(v => v.status === 'SKIPPED').length,
       totalCount: visits.length,
     });
   } catch (error) {

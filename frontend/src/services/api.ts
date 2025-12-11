@@ -83,6 +83,9 @@ export const api = {
     streetName: string;
     familyName: string;
     children: { firstName: string; specialInstructions?: string }[];
+    phoneNumber1?: string | null;
+    phoneNumber2?: string | null;
+    smsOptIn?: boolean;
   }) =>
     request<any>(`/families/invite/${inviteCode}`, {
       method: 'POST',
@@ -94,6 +97,9 @@ export const api = {
     streetName: string;
     familyName: string;
     children: { firstName: string; specialInstructions?: string }[];
+    phoneNumber1?: string | null;
+    phoneNumber2?: string | null;
+    smsOptIn?: boolean;
   }) =>
     request<any>(`/families/${familyId}`, {
       method: 'PUT',

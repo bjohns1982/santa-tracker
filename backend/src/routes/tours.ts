@@ -2,6 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { sendTourStartMessages } from '../services/smsService';
 
 const router = express.Router();
 
@@ -204,10 +205,21 @@ router.patch('/:id/status', authenticateToken, async (req: AuthRequest, res) => 
       return res.status(404).json({ error: 'Tour not found' });
     }
 
+    // If tour is being activated, send SMS messages to families with opt-in
+    if (status === 'ACTIVE') {
+      // Send SMS asynchronously (don't wait for it)
+      sendTourStartMessages(id).catch(err => {
+        console.error('Failed to send tour start SMS messages:', err);
+      });
+    }
+
     // Emit socket event
     const io = req.app.get('io');
     if (io) {
       io.to(`tour-${id}`).emit('tour-status-updated', { status, tourId: id });
+      if (status === 'ACTIVE') {
+        io.to(`tour-${id}`).emit('sms-sent', { tourId: id });
+      }
     }
 
     res.json({ success: true });
@@ -285,6 +297,22 @@ router.patch('/:id/families/order', authenticateToken, async (req: AuthRequest, 
               familyId,
               tourId: id,
               status: { not: 'COMPLETED' }, // Only update non-completed visits
+            },
+            data: { order },
+          })
+        )
+      );
+    }
+
+    // Also update SKIPPED visits if tour is active
+    if (tour.status === 'ACTIVE') {
+      await Promise.all(
+        familyOrders.map(({ familyId, order }: { familyId: string; order: number }) =>
+          prisma.visit.updateMany({
+            where: {
+              familyId,
+              tourId: id,
+              status: { notIn: ['COMPLETED', 'SKIPPED'] }, // Only update active visits
             },
             data: { order },
           })

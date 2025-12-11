@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { api } from '../services/api';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { api } from "../services/api";
+import PhoneNumberInput from "../components/Shared/PhoneNumberInput";
 
 interface Child {
   firstName: string;
@@ -11,12 +12,18 @@ export default function FamilySignUp() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
   const navigate = useNavigate();
   const [tour, setTour] = useState<any>(null);
-  const [streetNumber, setStreetNumber] = useState('');
-  const [streetName, setStreetName] = useState('');
-  const [familyName, setFamilyName] = useState('');
-  const [children, setChildren] = useState<Child[]>([{ firstName: '', specialInstructions: '' }]);
+  const [streetNumber, setStreetNumber] = useState("");
+  const [streetName, setStreetName] = useState("");
+  const [familyName, setFamilyName] = useState("");
+  const [children, setChildren] = useState<Child[]>([
+    { firstName: "", specialInstructions: "" },
+  ]);
+  const [smsOptIn, setSmsOptIn] = useState(false);
+  const [phoneNumber1, setPhoneNumber1] = useState("");
+  const [phoneNumber2, setPhoneNumber2] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (inviteCode) {
@@ -29,17 +36,18 @@ export default function FamilySignUp() {
 
   // Check if saved family ID is valid
   useEffect(() => {
-    const savedId = localStorage.getItem('lastFamilyId');
+    const savedId = localStorage.getItem("lastFamilyId");
     if (savedId) {
       // Verify the family still exists
-      api.getFamily(savedId)
+      api
+        .getFamily(savedId)
         .then(() => {
           setSavedFamilyId(savedId);
           setHasValidSavedFamily(true);
         })
         .catch(() => {
           // Family doesn't exist, clear it
-          localStorage.removeItem('lastFamilyId');
+          localStorage.removeItem("lastFamilyId");
           setHasValidSavedFamily(false);
         });
     }
@@ -50,12 +58,12 @@ export default function FamilySignUp() {
       const data = await api.getTourByInviteCode(inviteCode!);
       setTour(data);
     } catch (error: any) {
-      setError('Tour not found');
+      setError("Tour not found");
     }
   };
 
   const addChild = () => {
-    setChildren([...children, { firstName: '', specialInstructions: '' }]);
+    setChildren([...children, { firstName: "", specialInstructions: "" }]);
   };
 
   const removeChild = (index: number) => {
@@ -70,21 +78,43 @@ export default function FamilySignUp() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (!streetNumber || !streetName || !familyName) {
-      setError('Please fill in all required fields');
+      setError("Please fill in all required fields");
       return;
     }
 
-    if (children.some(c => !c.firstName.trim())) {
-      setError('Please provide first names for all children');
+    if (children.some((c) => !c.firstName.trim())) {
+      setError("Please provide first names for all children");
       return;
     }
 
+    // Validate phone numbers if SMS opt-in is enabled
+    if (smsOptIn) {
+      if (
+        !phoneNumber1 ||
+        phoneNumber1.length !== 12 ||
+        !phoneNumber1.startsWith("+1")
+      ) {
+        setPhoneError(
+          "Primary phone number is required and must be in format +1XXXXXXXXXX"
+        );
+        return;
+      }
+      if (
+        phoneNumber2 &&
+        (phoneNumber2.length !== 12 || !phoneNumber2.startsWith("+1"))
+      ) {
+        setPhoneError("Secondary phone number must be in format +1XXXXXXXXXX");
+        return;
+      }
+    }
+
+    setPhoneError("");
     setLoading(true);
     try {
-      const childrenData = children.map(c => ({
+      const childrenData = children.map((c) => ({
         firstName: c.firstName.trim(),
         specialInstructions: c.specialInstructions?.trim() || undefined,
       }));
@@ -94,26 +124,35 @@ export default function FamilySignUp() {
         streetName,
         familyName,
         children: childrenData,
+        phoneNumber1: smsOptIn ? phoneNumber1 : null,
+        phoneNumber2: smsOptIn && phoneNumber2 ? phoneNumber2 : null,
+        smsOptIn,
       });
 
       // Redirect to family view
       navigate(`/family/${familyData.id}`);
     } catch (err: any) {
-      setError(err.message || 'Failed to sign up');
+      setError(err.message || "Failed to sign up");
     } finally {
       setLoading(false);
     }
   };
 
   if (!tour && !error) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
   }
 
   if (error && !tour) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-holiday-red via-red-600 to-holiday-green">
         <div className="card max-w-md">
-          <h1 className="text-2xl font-bold text-holiday-red mb-4">Tour Not Found</h1>
+          <h1 className="text-2xl font-bold text-holiday-red mb-4">
+            Tour Not Found
+          </h1>
           <p className="text-gray-600">{error}</p>
         </div>
       </div>
@@ -126,7 +165,9 @@ export default function FamilySignUp() {
         <div className="card">
           <div className="text-center mb-8">
             <h1 className="text-5xl mb-4">🎅</h1>
-            <h2 className="text-3xl font-bold text-holiday-red mb-2">Sign Up for Santa's Visit!</h2>
+            <h2 className="text-3xl font-bold text-holiday-red mb-2">
+              Sign Up for Santa's Visit!
+            </h2>
             <p className="text-gray-600">Tour: {tour?.name}</p>
           </div>
 
@@ -177,6 +218,70 @@ export default function FamilySignUp() {
               />
             </div>
 
+            {/* SMS Opt-In Section */}
+            <div className="p-4 border-2 border-gray-200 rounded-lg bg-gray-50">
+              <div className="flex items-center mb-4">
+                <input
+                  type="checkbox"
+                  id="smsOptIn"
+                  checked={smsOptIn}
+                  onChange={(e) => {
+                    setSmsOptIn(e.target.checked);
+                    if (!e.target.checked) {
+                      setPhoneNumber1("");
+                      setPhoneNumber2("");
+                      setPhoneError("");
+                    }
+                  }}
+                  className="w-5 h-5 text-holiday-red border-gray-300 rounded focus:ring-holiday-red"
+                />
+                <label
+                  htmlFor="smsOptIn"
+                  className="ml-2 text-gray-700 font-semibold"
+                >
+                  Yes, send me text message updates about Santa's visit.
+                </label>
+              </div>
+              {smsOptIn && (
+                <div className="space-y-4 mt-4">
+                  <PhoneNumberInput
+                    value={phoneNumber1}
+                    onChange={setPhoneNumber1}
+                    label="Primary Phone Number"
+                    required={true}
+                    error={phoneError && phoneNumber1 ? phoneError : undefined}
+                  />
+                  <PhoneNumberInput
+                    value={phoneNumber2}
+                    onChange={setPhoneNumber2}
+                    label="Secondary Phone Number (Optional)"
+                    required={false}
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    By checking this box and providing your mobile number, you
+                    agree to receive 3-5 text messages on the day of the Santa
+                    Tour about your schedule and Santa's ETA. Message & data
+                    rates may apply. Reply STOP to opt out at any time, or HELP
+                    for help. See our{" "}
+                    <a
+                      href="/terms"
+                      className="text-holiday-red hover:underline"
+                    >
+                      Terms
+                    </a>{" "}
+                    and{" "}
+                    <a
+                      href="/privacy"
+                      className="text-holiday-red hover:underline"
+                    >
+                      Privacy Policy
+                    </a>{" "}
+                    at www.santa-tour.com/terms and www.santa-tour.com/privacy.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div>
               <div className="flex justify-between items-center mb-4">
                 <label className="block text-gray-700 font-semibold">
@@ -193,7 +298,10 @@ export default function FamilySignUp() {
 
               <div className="space-y-4">
                 {children.map((child, index) => (
-                  <div key={index} className="p-4 border-2 border-gray-200 rounded-lg">
+                  <div
+                    key={index}
+                    className="p-4 border-2 border-gray-200 rounded-lg"
+                  >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="block text-gray-700 font-semibold mb-2">
@@ -202,7 +310,9 @@ export default function FamilySignUp() {
                         <input
                           type="text"
                           value={child.firstName}
-                          onChange={(e) => updateChild(index, 'firstName', e.target.value)}
+                          onChange={(e) =>
+                            updateChild(index, "firstName", e.target.value)
+                          }
                           className="input-field"
                           required
                         />
@@ -225,13 +335,20 @@ export default function FamilySignUp() {
                       </label>
                       <input
                         type="text"
-                        value={child.specialInstructions || ''}
-                        onChange={(e) => updateChild(index, 'specialInstructions', e.target.value)}
+                        value={child.specialInstructions || ""}
+                        onChange={(e) =>
+                          updateChild(
+                            index,
+                            "specialInstructions",
+                            e.target.value
+                          )
+                        }
                         className="input-field"
                         placeholder="Tommy is looking for a bike, Julie's been sad lately..."
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Help Santa personalize the visit! Share gift ideas, things to celebrate, or ways to encourage.
+                        Help Santa personalize the visit! Share gift ideas,
+                        things to celebrate, or ways to encourage.
                       </p>
                     </div>
                   </div>
@@ -244,7 +361,7 @@ export default function FamilySignUp() {
               disabled={loading}
               className="btn-primary w-full text-lg py-4"
             >
-              {loading ? 'Submitting...' : 'Sign Up for Santa\'s Visit! 🎅'}
+              {loading ? "Submitting..." : "Sign Up for Santa's Visit! 🎅"}
             </button>
           </form>
 
@@ -263,7 +380,7 @@ export default function FamilySignUp() {
               </div>
             )}
             <p className="text-center text-gray-600 text-sm">
-              Already signed up?{' '}
+              Already signed up?{" "}
               <a
                 href={`/lookup/${inviteCode}`}
                 className="text-holiday-red font-semibold hover:underline"
@@ -277,4 +394,3 @@ export default function FamilySignUp() {
     </div>
   );
 }
-

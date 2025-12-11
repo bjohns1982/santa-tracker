@@ -8,6 +8,7 @@ import tourRoutes from './routes/tours';
 import familyRoutes from './routes/families';
 import visitRoutes from './routes/visits';
 import jokesRoutes from './routes/jokes';
+import smsRoutes from './routes/sms';
 
 dotenv.config();
 
@@ -35,6 +36,7 @@ app.use('/api/tours', tourRoutes);
 app.use('/api/families', familyRoutes);
 app.use('/api/visits', visitRoutes);
 app.use('/api/jokes', jokesRoutes);
+app.use('/api/sms', smsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

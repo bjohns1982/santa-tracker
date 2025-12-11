@@ -48,7 +48,7 @@ export default function FamilyView() {
   const myVisit = family ? visits.find((v) => v.family.id === family.id) || null : null;
 
   const activeVisits = visits
-    .filter((visit) => visit.status !== 'COMPLETED')
+    .filter((visit) => visit.status !== 'COMPLETED' && visit.status !== 'SKIPPED')
     .sort((a, b) => a.order - b.order);
 
   const completedVisits = visits
@@ -92,6 +92,14 @@ export default function FamilyView() {
         loadCurrentVisit(); // Reload to get updated order
       });
 
+      newSocket.on('family-added', () => {
+        loadCurrentVisit(); // Reload when a new family is added
+      });
+
+      newSocket.on('family-updated', () => {
+        loadCurrentVisit(); // Reload when a family is updated
+      });
+
       loadCurrentVisit();
 
       return () => {
@@ -127,6 +135,9 @@ export default function FamilyView() {
     streetName: string;
     familyName: string;
     children: { firstName: string; specialInstructions?: string }[];
+    phoneNumber1?: string | null;
+    phoneNumber2?: string | null;
+    smsOptIn?: boolean;
   }) => {
     if (!family) return;
     setIsSavingFamily(true);

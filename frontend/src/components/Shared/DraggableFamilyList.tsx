@@ -6,6 +6,9 @@ interface Family {
   streetName: string;
   familyName: string;
   order: number;
+  smsOptIn?: boolean;
+  phoneNumber1?: string | null;
+  phoneNumber2?: string | null;
   children: Array<{ 
     id: string;
     firstName: string;
@@ -197,6 +200,11 @@ export default function DraggableFamilyList({ families, onReorder, onFamilyClick
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {family.smsOptIn && (
+                <span className="text-xs bg-green-500 text-white px-2 py-1 rounded" title="SMS notifications enabled">
+                  📱
+                </span>
+              )}
               <span className="text-xs bg-holiday-gold text-white px-2 py-1 rounded font-bold">
                 #{index + 1}
               </span>
