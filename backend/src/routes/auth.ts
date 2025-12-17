@@ -58,8 +58,8 @@ router.post('/register', async (req, res) => {
     const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
     const token = jwt.sign(
       { userId: tourGuide.id },
-      jwtSecret as string,
-      { expiresIn: expiresIn as string }
+      jwtSecret,
+      { expiresIn } as any
     );
 
     res.status(201).json({
@@ -104,8 +104,8 @@ router.post('/login', async (req, res) => {
     const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
     const token = jwt.sign(
       { userId: tourGuide.id },
-      jwtSecret as string,
-      { expiresIn: expiresIn as string }
+      jwtSecret,
+      { expiresIn } as any
     );
 
     res.json({
