@@ -24,7 +24,7 @@ const COMMON_CITIES = [
 export default function CityAutocomplete({
   value,
   onChange,
-  state,
+  state: _state,
   placeholder = 'Enter city name',
   required = false,
 }: CityAutocompleteProps) {

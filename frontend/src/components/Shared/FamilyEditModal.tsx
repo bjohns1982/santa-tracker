@@ -219,7 +219,7 @@ export default function FamilyEditModal({ family, onClose, onSave }: FamilyEditM
             </button>
             <button
               type="submit"
-             .disabled={saving}
+              disabled={saving}
               className="btn-primary"
             >
               {saving ? 'Saving...' : 'Save Changes'}

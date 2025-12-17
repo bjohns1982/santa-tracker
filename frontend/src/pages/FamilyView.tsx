@@ -12,7 +12,10 @@ interface Family {
   streetName: string;
   latitude?: number | null;
   longitude?: number | null;
-  children: Array<{ firstName: string; specialInstructions?: string }>;
+  phoneNumber1?: string | null;
+  phoneNumber2?: string | null;
+  smsOptIn?: boolean;
+  children: Array<{ id?: string; firstName: string; specialInstructions?: string }>;
   tour: {
     id: string;
     name: string;
@@ -53,11 +56,7 @@ export default function FamilyView() {
 
   const completedVisits = visits
     .filter((visit) => visit.status === 'COMPLETED')
-    .sort((a, b) =>
-      a.completedAt && b.completedAt
-        ? new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
-        : a.order - b.order,
-    );
+    .sort((a, b) => a.order - b.order);
 
   const activePositionMap = new Map<string, number>();
   activeVisits.forEach((visit, index) => {
@@ -300,8 +299,8 @@ export default function FamilyView() {
     streetName: v.family.streetName,
     familyName: v.family.familyName,
     visited: v.status === 'COMPLETED',
-    latitude: v.family.latitude,
-    longitude: v.family.longitude,
+    latitude: v.family.latitude ?? undefined,
+    longitude: v.family.longitude ?? undefined,
   }));
 
   const currentActiveIndex = activeVisits.findIndex(
@@ -549,7 +548,20 @@ export default function FamilyView() {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         onSave={handleSaveFamily}
-        family={family}
+        family={family ? {
+          streetNumber: family.streetNumber,
+          streetName: family.streetName,
+          familyName: family.familyName,
+          phoneNumber1: family.phoneNumber1 ?? null,
+          phoneNumber2: family.phoneNumber2 ?? null,
+          smsOptIn: family.smsOptIn ?? false,
+          children: family.children.map((child, index) => ({
+            id: child.id || `temp-${index}`,
+            firstName: child.firstName,
+            specialInstructions: child.specialInstructions || null,
+          })),
+          tour: family.tour,
+        } : null}
         loading={isSavingFamily}
       />
     </div>
