@@ -30,9 +30,9 @@ export async function geocodeAddress(
       return null;
     }
 
-    const data = await response.json();
+    const data: any = await response.json();
 
-    if (data && data.length > 0) {
+    if (Array.isArray(data) && data.length > 0) {
       return {
         latitude: parseFloat(data[0].lat),
         longitude: parseFloat(data[0].lon),

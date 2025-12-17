@@ -55,10 +55,11 @@ router.post('/register', async (req, res) => {
       return res.status(500).json({ error: 'JWT secret not configured' });
     }
 
+    const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
     const token = jwt.sign(
       { userId: tourGuide.id },
-      jwtSecret,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      jwtSecret as string,
+      { expiresIn: expiresIn as string }
     );
 
     res.status(201).json({
@@ -100,10 +101,11 @@ router.post('/login', async (req, res) => {
       return res.status(500).json({ error: 'JWT secret not configured' });
     }
 
+    const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
     const token = jwt.sign(
       { userId: tourGuide.id },
-      jwtSecret,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      jwtSecret as string,
+      { expiresIn: expiresIn as string }
     );
 
     res.json({
