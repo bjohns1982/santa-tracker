@@ -2,6 +2,10 @@ FROM node:20-alpine as builder
 
 WORKDIR /app
 
+# Build argument for API URL (defaults to production API)
+ARG VITE_API_URL=https://api.santa-tour.com/api
+ENV VITE_API_URL=$VITE_API_URL
+
 # Copy package files
 COPY package*.json ./
 

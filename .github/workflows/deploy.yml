@@ -1,0 +1,52 @@
+name: Build and Push to ECR
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REGISTRY: 436387562737.dkr.ecr.us-east-2.amazonaws.com
+  BACKEND_REPO: santa-tracker-backend
+  FRONTEND_REPO: santa-tracker-frontend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push backend image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/${{ env.BACKEND_REPO }}:$IMAGE_TAG ./backend
+          docker push $ECR_REGISTRY/${{ env.BACKEND_REPO }}:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/${{ env.BACKEND_REPO }}:$IMAGE_TAG $ECR_REGISTRY/${{ env.BACKEND_REPO }}:latest
+          docker push $ECR_REGISTRY/${{ env.BACKEND_REPO }}:latest
+
+      - name: Build and push frontend image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build --build-arg VITE_API_URL=https://api.santa-tour.com/api -t $ECR_REGISTRY/${{ env.FRONTEND_REPO }}:$IMAGE_TAG ./frontend
+          docker push $ECR_REGISTRY/${{ env.FRONTEND_REPO }}:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/${{ env.FRONTEND_REPO }}:$IMAGE_TAG $ECR_REGISTRY/${{ env.FRONTEND_REPO }}:latest
+          docker push $ECR_REGISTRY/${{ env.FRONTEND_REPO }}:latest
+
