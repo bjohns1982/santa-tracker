@@ -11,37 +11,63 @@ This guide walks through implementing the plan to fix ECS services and set up Ap
 
 ## Step 1: Fix Backend Health Check
 
-### AWS Console Steps:
+**IMPORTANT**: The container health check must match the ALB target group health check. The ALB expects an HTTP 200 response from `/api/health`, so the container health check should verify the HTTP server is responding, not just that the process exists.
+
+### Step 1a: Update Backend Dockerfile
+
+First, ensure `curl` is installed in the Docker image. Update `backend/Dockerfile`:
+
+```dockerfile
+# Install OpenSSL for Prisma and curl for health checks
+RUN apk add --no-cache openssl curl
+```
+
+Then rebuild and push the image (see Step 1b below).
+
+### Step 1b: Rebuild and Push Backend Image
+
+Run these commands from your project root:
+
+```bash
+cd backend
+
+# Build image
+docker build -t santa-tracker-backend:latest .
+
+# Login to ECR
+aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 436387562737.dkr.ecr.us-east-2.amazonaws.com
+
+# Tag and push
+docker tag santa-tracker-backend:latest 436387562737.dkr.ecr.us-east-2.amazonaws.com/santa-tracker-backend:latest
+docker push 436387562737.dkr.ecr.us-east-2.amazonaws.com/santa-tracker-backend:latest
+```
+
+### Step 1c: Update ECS Task Definition Health Check
+
+**AWS Console Steps:**
 
 1. Go to **ECS → Task Definitions → `santa-tracker-backend`**
 2. Click **"Create new revision"**
 3. Scroll to **Container Definitions** → Click on the `backend` container
 4. Expand **Health check** section
-5. Update the health check:
-   - **Command**: `CMD-SHELL,pgrep node || exit 1`
+5. Update the health check to use HTTP endpoint verification:
+   - **Command**: `CMD-SHELL,curl -f http://localhost:3001/api/health || exit 1`
    - **Interval**: `30` seconds
    - **Timeout**: `5` seconds
    - **Retries**: `3`
    - **Start period**: `60` seconds
 6. Click **"Create"** to create the new revision
 7. Go to **ECS → Services → `santa-tracker-backend-service` → Update**
-8. Under **Task definition**, select the new revision (e.g., `santa-tracker-backend:2`)
-9. Click **"Update"** and wait for the service to deploy
+8. Under **Task definition**, select the new revision (e.g., `santa-tracker-backend:4`)
+9. Check **"Force new deployment"** to ensure the new image is used
+10. Click **"Update"** and wait for the service to deploy
 
-**Alternative if `pgrep` doesn't work**: We'll need to add `curl` to the Dockerfile (see Step 1b below)
+**Why this matters**: The ALB target group health check uses HTTP requests to `/api/health`. The container health check should verify the same endpoint to ensure consistency. Using `pgrep node` only checks if the process exists, not if the HTTP server is actually responding.
 
-### Step 1b (If needed): Add curl to Backend Dockerfile
+**Alternative (not recommended)**: If you must use process checking instead of HTTP:
 
-If the `pgrep` health check doesn't work, update `backend/Dockerfile`:
-
-```dockerfile
-# After line 6 (after openssl install), add:
-RUN apk add --no-cache curl
-```
-
-Then use this health check command instead:
-
-- **Command**: `CMD-SHELL,curl -f http://localhost:3001/api/health || exit 1`
+- **Command**: `CMD-SHELL,pgrep node || exit 1`
+- Note: This doesn't verify HTTP server functionality and may cause mismatches with ALB health checks
 
 ---
 
