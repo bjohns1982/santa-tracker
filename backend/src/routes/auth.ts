@@ -17,82 +17,57 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-// Register tour guide
+// Register tour guide - DISABLED (admin-only access)
 router.post('/register', async (req, res) => {
-  try {
-    const { email, password, name } = registerSchema.parse(req.body);
-
-    // Check if user already exists
-    const existingUser = await prisma.tourGuide.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email already registered' });
-    }
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Create user
-    const tourGuide = await prisma.tourGuide.create({
-      data: {
-        email,
-        passwordHash,
-        name,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        createdAt: true,
-      },
-    });
-
-    // Generate JWT
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      return res.status(500).json({ error: 'JWT secret not configured' });
-    }
-
-    const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
-    const token = jwt.sign(
-      { userId: tourGuide.id },
-      jwtSecret,
-      { expiresIn } as any
-    );
-
-    res.status(201).json({
-      tourGuide,
-      token,
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors });
-    }
-    console.error('Registration error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  return res.status(403).json({ error: 'Registration is disabled. Admin access only.' });
 });
 
-// Login tour guide
+// Login tour guide - Admin only (environment variable based)
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
 
-    // Find user
-    const tourGuide = await prisma.tourGuide.findUnique({
-      where: { email },
-    });
+    // Get admin credentials from environment variables
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
 
-    if (!tourGuide) {
+    if (!adminEmail || !adminPassword) {
+      console.error('ADMIN_EMAIL or ADMIN_PASSWORD not configured');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
+    // Check if email matches admin email
+    if (email !== adminEmail) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Verify password
-    const isValid = await bcrypt.compare(password, tourGuide.passwordHash);
-    if (!isValid) {
+    // Verify password (plain text comparison for simplicity)
+    if (password !== adminPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Find or create admin user in database (for compatibility with existing system)
+    let tourGuide = await prisma.tourGuide.findUnique({
+      where: { email: adminEmail },
+    });
+
+    // If admin user doesn't exist, create it
+    if (!tourGuide) {
+      // Hash password for storage (even though we check against env var)
+      const passwordHash = await bcrypt.hash(adminPassword, 10);
+      tourGuide = await prisma.tourGuide.create({
+        data: {
+          email: adminEmail,
+          passwordHash,
+          name: 'Admin', // You can customize this or add ADMIN_NAME env var
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          createdAt: true,
+        },
+      });
     }
 
     // Generate JWT
