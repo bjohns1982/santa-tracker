@@ -78,12 +78,7 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-gray-600">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-holiday-red font-semibold hover:underline">
-            Register here
-          </Link>
-        </p>
+        {/* Registration disabled - admin access only */}
       </div>
     </div>
   );

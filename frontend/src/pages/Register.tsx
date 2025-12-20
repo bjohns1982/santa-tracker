@@ -15,29 +15,8 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const response = await api.register(email, password, name);
-      login(response.tourGuide, response.token);
-      navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Registration failed');
-    } finally {
-      setLoading(false);
-    }
+    setError('Registration is disabled. Admin access only.');
+    return;
   };
 
   return (
@@ -47,6 +26,10 @@ export default function Register() {
           <h1 className="text-4xl font-bold text-holiday-red mb-2">🎅</h1>
           <h2 className="text-3xl font-bold text-holiday-red">Santa Tracker</h2>
           <p className="text-gray-600 mt-2">Create Tour Guide Account</p>
+        </div>
+
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+          Registration is disabled. This application is restricted to admin access only.
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -110,17 +93,16 @@ export default function Register() {
 
           <button
             type="submit"
-            disabled={loading}
-            className="btn-primary w-full"
+            disabled={true}
+            className="btn-primary w-full opacity-50 cursor-not-allowed"
           >
-            {loading ? 'Creating account...' : 'Register'}
+            Registration Disabled
           </button>
         </form>
 
         <p className="mt-6 text-center text-gray-600">
-          Already have an account?{' '}
           <Link to="/login" className="text-holiday-red font-semibold hover:underline">
-            Login here
+            Go to Login
           </Link>
         </p>
       </div>

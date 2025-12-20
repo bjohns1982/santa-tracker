@@ -14,7 +14,7 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -49,4 +49,3 @@ jobs:
           docker push $ECR_REGISTRY/${{ env.FRONTEND_REPO }}:$IMAGE_TAG
           docker tag $ECR_REGISTRY/${{ env.FRONTEND_REPO }}:$IMAGE_TAG $ECR_REGISTRY/${{ env.FRONTEND_REPO }}:latest
           docker push $ECR_REGISTRY/${{ env.FRONTEND_REPO }}:latest
-
