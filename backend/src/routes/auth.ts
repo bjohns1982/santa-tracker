@@ -49,17 +49,24 @@ router.post('/login', async (req, res) => {
     // Find or create admin user in database (for compatibility with existing system)
     let tourGuide = await prisma.tourGuide.findUnique({
       where: { email: adminEmail },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+      },
     });
 
     // If admin user doesn't exist, create it
     if (!tourGuide) {
       // Hash password for storage (even though we check against env var)
       const passwordHash = await bcrypt.hash(adminPassword, 10);
+      const adminName = process.env.ADMIN_NAME || 'Admin';
       tourGuide = await prisma.tourGuide.create({
         data: {
           email: adminEmail,
           passwordHash,
-          name: 'Admin', // You can customize this or add ADMIN_NAME env var
+          name: adminName,
         },
         select: {
           id: true,
