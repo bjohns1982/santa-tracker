@@ -33,7 +33,12 @@ router.post('/login', async (req, res) => {
 
     if (!adminEmail || !adminPassword) {
       console.error('ADMIN_EMAIL or ADMIN_PASSWORD not configured');
-      return res.status(500).json({ error: 'Server configuration error' });
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      return res.status(500).json({ 
+        error: isDevelopment 
+          ? 'ADMIN_EMAIL and ADMIN_PASSWORD must be set in backend/.env file for local development'
+          : 'Server configuration error' 
+      });
     }
 
     // Check if email matches admin email

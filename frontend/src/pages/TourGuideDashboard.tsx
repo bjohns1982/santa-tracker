@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../services/api";
-import { io } from "socket.io-client";
+import { createSocket } from "../services/socket";
 import DraggableFamilyList from "../components/Shared/DraggableFamilyList";
 import CityAutocomplete from "../components/Shared/CityAutocomplete";
 import FamilyDetailsModal from "../components/Shared/FamilyDetailsModal";
@@ -60,7 +60,7 @@ export default function TourGuideDashboard() {
 
   useEffect(() => {
     if (selectedTour) {
-      const newSocket = io("http://localhost:3001");
+      const newSocket = createSocket();
       newSocket.emit("join-tour", selectedTour.id);
 
       newSocket.on("visit-updated", () => {

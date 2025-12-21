@@ -18,18 +18,18 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [tourGuide, setTourGuide] = useState<TourGuide | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  // Initialize state directly from localStorage (synchronous) to avoid race condition
+  const getInitialTourGuide = (): TourGuide | null => {
+    const saved = localStorage.getItem('tourGuide');
+    return saved ? JSON.parse(saved) : null;
+  };
 
-  useEffect(() => {
-    // Load from localStorage on mount
-    const savedTourGuide = localStorage.getItem('tourGuide');
-    const savedToken = localStorage.getItem('token');
-    if (savedTourGuide && savedToken) {
-      setTourGuide(JSON.parse(savedTourGuide));
-      setToken(savedToken);
-    }
-  }, []);
+  const getInitialToken = (): string | null => {
+    return localStorage.getItem('token');
+  };
+
+  const [tourGuide, setTourGuide] = useState<TourGuide | null>(getInitialTourGuide);
+  const [token, setToken] = useState<string | null>(getInitialToken);
 
   const login = (newTourGuide: TourGuide, newToken: string) => {
     setTourGuide(newTourGuide);

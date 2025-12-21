@@ -295,6 +295,7 @@ router.get('/:id', async (req, res) => {
             name: true,
             status: true,
             inviteCode: true,
+            startedAt: true,
           },
         },
       },

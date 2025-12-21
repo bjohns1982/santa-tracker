@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, useMap, Popup, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -39,24 +39,76 @@ interface SantaMapProps {
     visited?: boolean;
   }>;
   onSantaClick?: () => void;
+  tourStarted?: boolean;
 }
 
-function CenterOnSanta({ location }: { location: { lat: number; lng: number } | null }) {
+function CenterOnSantaButton({ 
+  location, 
+  tourStarted 
+}: { 
+  location: { lat: number; lng: number } | null;
+  tourStarted?: boolean;
+}) {
   const map = useMap();
-  
-  useEffect(() => {
-    if (location) {
-      map.setView([location.lat, location.lng], map.getZoom());
-    }
-  }, [location, map]);
+  const [shouldCenter, setShouldCenter] = useState(false);
 
-  return null;
+  // Auto-center when tour starts and Santa location is available
+  useEffect(() => {
+    if (tourStarted && location && !shouldCenter) {
+      map.setView([location.lat, location.lng], 16);
+      setShouldCenter(true);
+    }
+  }, [location, tourStarted, map, shouldCenter]);
+
+  const handleCenterClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (location) {
+      // Center on Santa with appropriate zoom level
+      map.setView([location.lat, location.lng], 16, {
+        animate: true,
+        duration: 0.5
+      });
+    }
+  };
+
+  // Always show button, but only enable when location is available
+  const hasLocation = !!location;
+
+  return (
+    <div 
+      className="leaflet-top leaflet-right" 
+      style={{ 
+        zIndex: 1000, 
+        marginTop: '10px', 
+        marginRight: '10px',
+        pointerEvents: 'auto'
+      }}
+    >
+      <button
+        onClick={handleCenterClick}
+        disabled={!hasLocation}
+        className={`bg-white border-2 rounded-lg shadow-lg px-4 py-2 flex items-center gap-2 font-semibold ${
+          hasLocation 
+            ? 'text-gray-700 hover:bg-gray-100 border-gray-300 cursor-pointer' 
+            : 'text-gray-400 opacity-50 cursor-not-allowed border-gray-200'
+        }`}
+        title={hasLocation ? "Center map on Santa" : "Waiting for Santa's location"}
+        type="button"
+        style={{ pointerEvents: 'auto' }}
+      >
+        <span className="text-2xl">🎅</span>
+        <span>Center on Santa</span>
+      </button>
+    </div>
+  );
 }
 
 export default function SantaMap({
   santaLocation,
   families,
   onSantaClick,
+  tourStarted = false,
 }: SantaMapProps) {
   // Geocode addresses to get coordinates (simplified - in production, use a geocoding service)
   // For now, we'll use a mock approach - families would need lat/lng stored
@@ -117,7 +169,7 @@ export default function SantaMap({
           );
         })}
 
-        <CenterOnSanta location={santaLocation} />
+        <CenterOnSantaButton location={santaLocation} tourStarted={tourStarted} />
       </MapContainer>
     </div>
   );

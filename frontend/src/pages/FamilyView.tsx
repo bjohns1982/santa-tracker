@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { io } from 'socket.io-client';
+import { createSocket } from '../services/socket';
 import { api } from '../services/api';
 import SantaMap from '../components/Map/SantaMap';
 import FamilyEditModal from '../components/FamilyEditModal';
@@ -72,7 +72,7 @@ export default function FamilyView() {
 
   useEffect(() => {
     if (family?.tour.id) {
-      const newSocket = io('http://localhost:3001');
+      const newSocket = createSocket();
       newSocket.emit('join-tour', family.tour.id);
 
       newSocket.on('santa-location', (data: { latitude: number; longitude: number }) => {
@@ -84,6 +84,12 @@ export default function FamilyView() {
       });
 
       newSocket.on('tour-started', () => {
+        loadFamily(); // Reload family to get updated tour status and startedAt
+        loadCurrentVisit();
+      });
+
+      newSocket.on('tour-status-updated', () => {
+        loadFamily(); // Reload family to get updated tour status
         loadCurrentVisit();
       });
 
@@ -179,7 +185,8 @@ export default function FamilyView() {
       return null;
     }
 
-    // Don't show ETA if tour hasn't started
+    // Only show ETA if tour is ACTIVE and has started
+    // If tour is stopped (PLANNED or COMPLETED), don't show ETA
     if (!family.tour.startedAt || family.tour.status !== 'ACTIVE') {
       return null;
     }
@@ -187,9 +194,13 @@ export default function FamilyView() {
     const myActiveIndex = activeVisits.findIndex((visit) => visit.id === myVisit.id);
     if (myActiveIndex === -1) return null;
 
+    // Find the current visit that Santa is on the way to or visiting
     const currentActiveIndex = activeVisits.findIndex(
       (visit) => visit.status === 'ON_WAY' || visit.status === 'VISITING',
     );
+    
+    // If no visit is active yet, Santa hasn't started, so use index 0
+    // This means if user is at position 2, there are 2 visits before them
     const effectiveCurrentIndex = currentActiveIndex === -1 ? 0 : currentActiveIndex;
 
     const visitsRemaining = Math.max(0, myActiveIndex - effectiveCurrentIndex);
@@ -202,16 +213,25 @@ export default function FamilyView() {
   };
 
   const calculateScheduleStatus = (): { status: string; message: string } => {
-    if (!family || !visits.length || !family.tour.startedAt) {
+    if (!family || !visits.length) {
       return { status: 'on-time', message: "Santa's getting ready! 🎅" };
     }
 
-    const tourStartedAt = new Date(family.tour.startedAt);
+    // If tour hasn't started (no startedAt or not ACTIVE), show "getting ready"
+    if (!family.tour.startedAt || family.tour.status !== 'ACTIVE') {
+      return { status: 'on-time', message: "Santa's getting ready! 🎅" };
+    }
+
+    // Tour is active - check if Santa has started visiting
     const currentVisit = visits.find(v => v.status === 'ON_WAY' || v.status === 'VISITING');
+    
+    // If no active visit yet but tour has started, show "on his way"
     if (!currentVisit) {
-      return { status: 'on-time', message: "Santa's getting ready! 🎅" };
+      return { status: 'on-time', message: "Santa's on his way! 🎅" };
     }
 
+    // Calculate schedule timing based on current visit
+    const tourStartedAt = new Date(family.tour.startedAt);
     const now = new Date();
     const elapsedMinutes = (now.getTime() - tourStartedAt.getTime()) / (1000 * 60);
     const expectedMinutes = currentVisit.order * 5;
@@ -380,6 +400,7 @@ export default function FamilyView() {
                   santaLocation={santaLocation}
                   families={familiesForMap}
                   onSantaClick={handleSantaClick}
+                  tourStarted={family.tour.status === 'ACTIVE' && !!family.tour.startedAt}
                 />
               </div>
             </div>
