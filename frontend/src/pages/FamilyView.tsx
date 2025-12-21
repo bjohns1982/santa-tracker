@@ -179,18 +179,13 @@ export default function FamilyView() {
       return null;
     }
 
+    // Don't show ETA if tour hasn't started
+    if (!family.tour.startedAt || family.tour.status !== 'ACTIVE') {
+      return null;
+    }
+
     const myActiveIndex = activeVisits.findIndex((visit) => visit.id === myVisit.id);
     if (myActiveIndex === -1) return null;
-
-    // If tour hasn't started, estimate based on queue position
-    if (!family.tour.startedAt || family.tour.status !== 'ACTIVE') {
-      const minutesUntilArrival = myActiveIndex * 5;
-      const now = new Date();
-      return {
-        time: new Date(now.getTime() + minutesUntilArrival * 60 * 1000),
-        visitsRemaining: myActiveIndex,
-      };
-    }
 
     const currentActiveIndex = activeVisits.findIndex(
       (visit) => visit.status === 'ON_WAY' || visit.status === 'VISITING',
